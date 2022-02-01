@@ -1,13 +1,13 @@
 # GoTemp (server)
 
-GoTemp is a multi-inbox, single-user temporary email server you can self-host, it features a [SMTP Server](smtp/smtp.go), an [email parser](smtp/parser.go), a [socket server](api/socket.go) and a [REST API](api/api.go) in which you can access the mailboxes and read the emails.
+GoTemp is a multi-inbox, single-user temporary email server you can self-host, it features a [SMTP server](smtp/smtp.go), an [email parser](smtp/parser.go), a [socket server](api/socket.go) and a [REST API](api/api.go) in which you can access the mailboxes and read the emails.
 
 The database of choice is **SQLite**.
 
 ## Building
 
 ```sh
-go mod install .
+go mod download
 go build .
 ```
 
