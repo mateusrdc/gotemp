@@ -5,6 +5,7 @@ import (
 	b64 "encoding/base64"
 	"io"
 	"log"
+	"mime"
 	qp "mime/quotedprintable"
 	"net/textproto"
 	"regexp"
@@ -26,6 +27,17 @@ func GetHeaders(data string) (*textproto.MIMEHeader, error) {
 	}
 
 	return &headers, nil
+}
+
+func decodeMimeHeader(headerContent string) string {
+	decoder := new(mime.WordDecoder)
+	result, err := decoder.DecodeHeader(headerContent)
+
+	if err != nil {
+		return headerContent
+	}
+
+	return result
 }
 
 func ParseData(data string, trace bool) (string, string) {

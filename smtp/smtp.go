@@ -107,7 +107,7 @@ func (s *Session) Data(r io.Reader) error {
 
 		// Save mail to the database
 		model := database.Mail{
-			Subject:   headers.Get("Subject"),
+			Subject:   decodeMimeHeader(headers.Get("Subject")),
 			From:      s.from,
 			To:        s.to,
 			Body:      body,
