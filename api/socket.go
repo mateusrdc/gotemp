@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/labstack/echo/v4"
 )
 
 var upgrader = websocket.Upgrader{
@@ -22,11 +23,14 @@ type Client struct {
 
 var clients = make([]*Client, 0)
 
-func socketHandler(w http.ResponseWriter, r *http.Request) {
+func socketHandler(c echo.Context) error {
+	w := c.Response()
+	r := c.Request()
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	close := true
 	if err != nil {
-		return
+		return nil
 	}
 
 	defer func() {
@@ -39,7 +43,7 @@ func socketHandler(w http.ResponseWriter, r *http.Request) {
 	conn.SetReadDeadline(time.Now().Add(time.Second * 15))
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
-		return
+		return nil
 	}
 
 	message := string(msg)
@@ -56,11 +60,12 @@ func socketHandler(w http.ResponseWriter, r *http.Request) {
 			go client.readPump()
 			close = false
 
-			return
+			return nil
 		}
 	}
 
 	conn.WriteMessage(websocket.TextMessage, []byte("{\"type\": \"AUTH_ERROR\", \"data\": null}"))
+	return nil
 }
 
 func SendSocketMessage(msgtype string, data interface{}) {

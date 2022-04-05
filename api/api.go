@@ -4,7 +4,8 @@ import (
 	"gotemp/database"
 	"log"
 
-	"github.com/gin-gonic/gin"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"gorm.io/gorm"
 )
 
@@ -27,16 +28,21 @@ func Init(db *gorm.DB, key string) {
 
 	secret_key = key
 
-	if GetEnv("DEBUG", "false") == "false" {
-		gin.SetMode(gin.ReleaseMode)
+	e := echo.New()
+
+	if GetEnv("DEBUG", "false") == "true" {
+		e.Debug = true
+		e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+			Format:           "${time_custom} [API REQUEST] | ${status} | ${latency_human} | ${remote_ip} | ${method} ${uri}\n",
+			CustomTimeFormat: "2006/01/02 15:04:05",
+		}))
 	}
 
-	r := gin.Default()
+	e.HideBanner = true
+	e.HidePort = true
+	e.Use(CorsMiddleware())
 
-	r.SetTrustedProxies(nil)
-	r.Use(CorsMiddleware())
-
-	g := r.Group("/")
+	g := e.Group("")
 	{
 		g.Use(AuthMiddleware(key))
 
@@ -51,57 +57,54 @@ func Init(db *gorm.DB, key string) {
 		g.PUT("/mailboxes/:id/:mailid/read", api.MarkEmailRead)
 	}
 
-	r.GET("/socket", gin.WrapF(socketHandler))
+	e.GET("/socket", socketHandler)
 
 	log.Println("Starting API server at", GetEnv("API_ADDRESS", ":2527"))
-	r.Run(GetEnv("API_ADDRESS", ":2527"))
+	e.Start(GetEnv("API_ADDRESS", ":2527"))
 }
 
 // GET /status: checks whether the client is authorized to make further queries
 // {success: bool}
-func (api *API) GetStatus(c *gin.Context) {
-	c.JSON(200, gin.H{"success": true, "server_name": api.ServerName})
+func (api *API) GetStatus(c echo.Context) error {
+	return c.JSON(200, echo.Map{"success": true, "server_name": api.ServerName})
 }
 
 // GET /mailboxes: returns all mailboxes
 // {success: bool, mailboxes: []MailBox}
-func (api *API) GetAll(c *gin.Context) {
+func (api *API) GetAll(c echo.Context) error {
 	var mailboxes []database.MailBox
 
 	api.Database.Order("last_email_at desc").Find(&mailboxes)
 
-	c.JSON(200, gin.H{"success": true, "mailboxes": mailboxes})
+	return c.JSON(200, echo.Map{"success": true, "mailboxes": mailboxes})
 }
 
 // GET /mailboxes/:id: gets an specific mailbox contents (including emails)
 // {success: bool, mailbox: MailBox}
-func (api *API) GetOne(c *gin.Context) {
+func (api *API) GetOne(c echo.Context) error {
 	var mailbox database.MailBox
 
 	if q := api.Database.Where("id = ?", c.Param("id")).Preload("Emails").Limit(1).Find(&mailbox); q.RowsAffected == 0 {
-		c.JSON(400, gin.H{"success": false, "error": "Invalid mailbox"})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": "Invalid mailbox"})
 	}
 
-	c.JSON(200, gin.H{"success": true, "mailbox": mailbox})
+	return c.JSON(200, echo.Map{"success": true, "mailbox": mailbox})
 }
 
 // PUT /mailboxes/:id/ - edit mailbox (locked, title etc)
 // {success: bool, id: string}
-func (api *API) EditOne(c *gin.Context) {
+func (api *API) EditOne(c echo.Context) error {
 	var input MailBoxForm
 
 	if e := c.Bind(&input); e != nil {
-		c.JSON(400, gin.H{"success": false, "error": e.Error()})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": e.Error()})
 	}
 
 	// Check if the email exists
 	var mailbox database.MailBox
 
 	if q := api.Database.Where("id = ?", c.Param("id")).Limit(1).Find(&mailbox); q.RowsAffected == 0 {
-		c.JSON(400, gin.H{"success": false, "error": "Invalid mailbox"})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": "Invalid mailbox"})
 	}
 
 	// Update its properties
@@ -113,8 +116,7 @@ func (api *API) EditOne(c *gin.Context) {
 	time, err := parseExpiration(input.Expiration)
 
 	if err != nil {
-		c.JSON(400, gin.H{"success": false, "error": err.Error()})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": err.Error()})
 	}
 
 	mailbox.ExpiresAt = time
@@ -122,18 +124,17 @@ func (api *API) EditOne(c *gin.Context) {
 	// Save model
 	api.Database.Save(&mailbox)
 
-	c.JSON(200, gin.H{"success": true, "id": c.Param("id")})
 	SendSocketMessage("MAILBOX_EDITED", mailbox)
+	return c.JSON(200, echo.Map{"success": true, "id": c.Param("id")})
 }
 
 // POST /mailboxes: creates a new mailbox
 // {success: bool, id: string}
-func (api *API) Create(c *gin.Context) {
+func (api *API) Create(c echo.Context) error {
 	var data MailBoxForm
 
 	if e := c.Bind(&data); e != nil {
-		c.JSON(400, gin.H{"success": false, "error": e.Error()})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": e.Error()})
 	}
 
 	model := database.MailBox{
@@ -146,55 +147,49 @@ func (api *API) Create(c *gin.Context) {
 	time, err := parseExpiration(data.Expiration)
 
 	if err != nil {
-		c.JSON(400, gin.H{"success": false, "error": err.Error()})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": err.Error()})
 	}
 
 	model.ExpiresAt = time
 
 	// Make sure a mailbox with the choosen address doesn't exists already
 	if q := api.Database.Where("address = ?", data.Address).Limit(1).Find(&database.MailBox{}); q.RowsAffected != 0 {
-		c.JSON(400, gin.H{"success": false, "error": "A Mailbox with this address already exists!"})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": "A Mailbox with this address already exists!"})
 	}
 
 	if q := api.Database.Create(&model); q.RowsAffected == 0 {
-		c.JSON(500, gin.H{"success": false, "error": q.Error.Error()})
-		return
+		return c.JSON(500, echo.Map{"success": false, "error": q.Error.Error()})
 	}
 
-	c.JSON(200, gin.H{"success": true, "id": model.ID})
 	SendSocketMessage("MAILBOX_CREATED", model)
+	return c.JSON(200, echo.Map{"success": true, "id": model.ID})
 }
 
 // DELETE /mailboxes/:id: deletes a mailbox
 // {success: bool, id: string}
-func (api *API) Delete(c *gin.Context) {
+func (api *API) Delete(c echo.Context) error {
 	if q := api.Database.Where("id = ?", c.Param("id")).Delete(&database.MailBox{}); q.RowsAffected == 0 {
-		c.JSON(400, gin.H{"success": false, "error": "Invalid mailbox"})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": "Invalid mailbox"})
 	}
 
 	// Delete emails associated with this mailbox
 	api.Database.Exec("DELETE FROM mails WHERE mail_box_id = ?", c.Param("id"))
 
-	c.JSON(200, gin.H{"success": true, "id": c.Param("id")})
 	SendSocketMessage("MAILBOX_DELETED", c.Param("id"))
+	return c.JSON(200, echo.Map{"success": true, "id": c.Param("id")})
 }
 
 // DELETE /mailboxes/:id/emails deletes email(s)
 // {success: bool, id: string}
-func (api *API) DeleteEmails(c *gin.Context) {
+func (api *API) DeleteEmails(c echo.Context) error {
 	var input []string
 
 	if e := c.Bind(&input); e != nil {
-		c.JSON(400, gin.H{"success": false, "error": e.Error()})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": e.Error()})
 	}
 
 	if len(input) > 50 {
-		c.JSON(400, gin.H{"success": false, "error": "Too many emails to delete"})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": "Too many emails to delete"})
 	}
 
 	// Update unread count
@@ -207,18 +202,17 @@ func (api *API) DeleteEmails(c *gin.Context) {
 	// Delete items from database
 	api.Database.Exec("DELETE FROM mails WHERE mail_box_id = ? AND id IN ?", c.Param("id"), input)
 
-	c.JSON(200, gin.H{"success": true})
+	return c.JSON(200, echo.Map{"success": true})
 }
 
 // PUT /mailboxes/:id/:mailid/read - mark a email as read
 // {success: bool, id: string}
-func (api *API) MarkEmailRead(c *gin.Context) {
+func (api *API) MarkEmailRead(c echo.Context) error {
 	if q := api.Database.Model(&database.Mail{}).Where("id = ? AND mail_box_id = ? AND read = ?", c.Param("mailid"), c.Param("id"), false).Update("read", true); q.RowsAffected == 0 {
-		c.JSON(400, gin.H{"success": false, "error": "Invalid email and/or mailbox"})
-		return
+		return c.JSON(400, echo.Map{"success": false, "error": "Invalid email and/or mailbox"})
 	}
 
 	api.Database.Exec("UPDATE mail_boxes SET unread_count = unread_count - 1 WHERE id = ?", c.Param("id"))
 
-	c.JSON(200, gin.H{"success": true, "id": c.Param("mailid")})
+	return c.JSON(200, echo.Map{"success": true, "id": c.Param("mailid")})
 }
