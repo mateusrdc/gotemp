@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"os"
 	"time"
 )
 
@@ -28,4 +29,14 @@ func parseExpiration(expiration string) (time.Time, error) {
 		// No expiration time set, default to 24 hours from now
 		return time.Now().Add(time.Hour * 24), nil
 	}
+}
+
+func isDirectory(path string) bool {
+	info, err := os.Stat(path)
+
+	if errors.Is(err, os.ErrNotExist) || !info.IsDir() {
+		return false
+	}
+
+	return true
 }

@@ -30,7 +30,14 @@ func Init(db *gorm.DB, key string) {
 	initAPI(e, db)
 
 	e.GET("/socket", socketHandler)
-	e.Static("/", "public")
+
+	if GetEnv("HTTP_DISABLE_WEBUI", "false") != "true" {
+		if isDirectory("public") {
+			e.Static("/", "public")
+		} else {
+			log.Println("WebUI disabled due to absent 'public' folder.")
+		}
+	}
 
 	log.Println("Starting HTTP server at", GetEnv("HTTP_ADDRESS", ":2527"))
 	e.Start(GetEnv("HTTP_ADDRESS", ":2527"))
