@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"gotemp/api"
 	"gotemp/database"
+	"gotemp/http"
 
 	"github.com/emersion/go-smtp"
 	"gorm.io/gorm"
@@ -122,7 +122,7 @@ func (s *Session) Data(r io.Reader) error {
 		s.mailbox.UnreadCount++
 
 		// Send the new email over socket to clients
-		api.SendSocketMessage("NEW_EMAIL", map[string]interface{}{"mailbox_id": s.mailbox.ID, "email": model})
+		http.SendSocketMessage("NEW_EMAIL", map[string]interface{}{"mailbox_id": s.mailbox.ID, "email": model})
 
 		db.Save(s.mailbox)
 	}

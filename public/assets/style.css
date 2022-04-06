@@ -1,0 +1,160 @@
+/*
+ *
+ * Main screen
+ *
+ */
+#container {display: flex; flex-direction: column; width: 100%; height: 100%}
+
+/* Mailbox view */
+#container > #mailboxes_container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 250px);
+    grid-template-rows: repeat(auto-fill, 150px);
+    grid-gap: 15px;
+    width: 100vw;
+    height: 100%;
+    overflow: hidden;
+    flex: 1;
+    padding: 0px 15px;
+    margin-bottom: 15px;
+    justify-content: center;
+    overflow-y: auto;
+}
+
+#container > #mailboxes_container > .mailbox {
+    position: relative;
+    padding: 15px;
+    width: 250px;
+    height: 150px;
+    border: 1px solid rgba(0,0,0,.1);
+    border-radius: 12px;
+    transition: all 180ms linear;
+    transition-property: background, border-color, opacity, box-shadow;
+}
+
+#container > #mailboxes_container > .mailbox:hover {
+    background: rgba(30, 135, 240, 0.01);
+    border-color: rgba(30, 135, 240, 0.5);
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgb(0 0 0 / 8%)
+}
+#container > #mailboxes_container > .mailbox > .unread-count {float: right; opacity: 0.75;}
+#container > #mailboxes_container > .mailbox > .unread-count.zero {display: none}
+#container > #mailboxes_container > .mailbox:hover > .unread-count {opacity: 1}
+
+#container > #mailboxes_container > .mailbox > .mailbox-controls {
+    position: absolute;
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(20px, 1fr));
+    grid-template-rows: auto;
+    bottom: 0;
+    left: 0;
+    padding: 15px;
+    align-items: center;
+    text-align: center;
+    background: rgba(240,240,240,0.15);
+    border-radius: 0px 0px 12px 12px;
+    transition: all 180ms linear;
+    transition-property: background, opacity;
+}
+#container > #mailboxes_container > .mailbox:hover > .mailbox-controls {background: rgba(240, 240, 240, 0.5)}
+#container > #mailboxes_container > .mailbox .uk-icon {opacity: 0.2}
+#container > #mailboxes_container > .mailbox:hover .uk-icon {opacity: 0.5}
+#container > #mailboxes_container > .mailbox .uk-icon:hover {opacity: 1}
+#container > #mailboxes_container > .mailbox .lock-status.locked {color: #0074D9; opacity: 1}
+#container > #mailboxes_container > .mailbox .mailbox-name {margin: 0; overflow: hidden; text-overflow: ellipsis;}
+#container > #mailboxes_container > .mailbox .mailbox-address {margin: 15px 0px; overflow: hidden; text-overflow: ellipsis; margin: 16.5px 0}
+
+/* Emails list view */
+#container > #mailbox_header .lock-status.locked {color: #0074D9; opacity: 1}
+
+#container > #email_list_container {
+    display: block;
+    width: 100vw;
+    height: 100%;
+    overflow-y: auto;
+    flex: 1;
+    padding: 0px 20px 20px 20px;
+}
+
+#container > #email_list_container > .email {
+    padding: 15px;
+    width: 100%;
+    border: 1px solid rgba(0,0,0,.1);
+    border-bottom: none;
+    white-space: nowrap;
+    font-size: 0;
+}
+
+#container > #email_list_container > .email.read:not(.checked) {opacity: .75}
+#container > #email_list_container > .email.checked {background: #f5f5f5}
+#container > #email_list_container > .email > * {display: inline-block; margin: 0; text-overflow: ellipsis; overflow: hidden; vertical-align: middle; font-size: 1rem}
+#container > #email_list_container > .email > input[type="checkbox"] {width: 30px;}
+#container > #email_list_container > .email > .from {width: 25%}
+#container > #email_list_container > .email > .subject {width: calc(65% - 30px); padding: 0px 15px;}
+#container > #email_list_container > .email > .time {width: 10%; text-align: right; }
+
+#container > #email_list_container > .email:first-child {border-radius: 12px 12px 0px 0px}
+#container > #email_list_container > .email:last-child {border-radius: 0px 0px 12px 12px; border-bottom: 1px solid rgba(0,0,0,.1);}
+#container > #email_list_container > .email:hover {cursor: pointer;}
+#container > #email_list_container > .email:not(.checked):hover {background: rgba(30, 135, 240, 0.025);}
+
+/* Email view */
+#container > #email_container {
+    display: block;
+    width: 100vw;
+    height: 100%;
+    overflow-y: auto;
+    flex: 1;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+/*
+ *
+ * Login screen
+ *
+ */
+
+
+
+/*
+ *
+ * General
+ *
+ */
+html, body, #app {width: 100%; height: 100%;}
+* {box-sizing: border-box;}
+
+.uk-button, .uk-notification, .uk-modal-dialog, .uk-modal-footer, .uk-input, .uk-notification-message {border-radius: 12px}
+
+.uk-button.uk-button-primary {background-color: #0074D9}
+.uk-button.uk-button-light {background: rgba(255,255,255,.1); color: rgba(255,255,255,.7); padding: 0px 15px}
+.uk-button.uk-button-light:disabled {opacity: 0.75}
+.uk-button.uk-button-light:not(:disabled):hover {background: rgba(255,255,255,.15); color: rgba(255,255,255,.95); padding: 0px 15px}
+.uk-button-group > .uk-button {border-radius: 0}
+.uk-button-group > .uk-button:first-child {border-radius: 12px 0px 0px 12px}
+.uk-button-group > .uk-button:last-child {border-radius: 0px 12px 12px 0px}
+.uk-icon-button:hover {cursor: pointer;}
+
+.uk-modal.uk-open, .uk-modal.uk-togglabe-leave {display: flex !important; flex-direction: column; justify-content: center;}
+.uk-modal-footer .uk-button:not(:last-child) {margin-right: 5px}
+
+.uk-navbar {background: #0074D9 !important}
+.uk-navbar-nav .uk-icon {vertical-align: text-top;}
+
+.uk-form-multiple {display: flex;}
+.uk-form-multiple > input {flex: 1;}
+
+.uk-margin-15-bottom {margin-bottom: 15px;}
+.uk-divider-90:after {text-align: center; width: 90%}
+.uk-child-inline-block > * {display: inline-block;}
+
+hr {text-align: center;}
+
+::-webkit-scrollbar {width: 8px;}
+::-webkit-scrollbar-track {background-color: transparent;}
+::-webkit-scrollbar-thumb {background-color: darkgrey;}
+
+[v-cloak] {display: none !important;}

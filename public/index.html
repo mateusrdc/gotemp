@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>GoTemp</title>
+
+        <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/uikit@3.9.4/dist/js/uikit.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/uikit@3.9.4/dist/js/uikit-icons.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/dompurify@2.3.4/dist/purify.min.js"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.9.4/dist/css/uikit.min.css">
+
+        <link rel="stylesheet" href="assets/style.css">
+        <link rel="stylesheet" href="assets/style.dark.css">
+    </head>
+    <body>
+        <div id="app" v-cloak>
+            <!-- Main screen -->
+            <div v-if="ready === true" id="container">
+                <!-- Navbar -->
+                <nav class="uk-navbar-container uk-light" uk-navbar>
+                    <div class="uk-navbar-left uk-margin-left">
+                        <a class="uk-navbar-item uk-logo uk-padding-remove-left" href="javascript:void(0)" @click="goBackToStart">GoTemp</a>
+
+                        <a href="javascript:void(0)" uk-tooltip="Change Theme" class="uk-icon-button" uk-icon="paint-bucket" @click="switchTheme"></a>
+                    </div>
+
+                    <div class="uk-navbar-center">
+                        <p class="uk-margin-remove">{{ server_name }}</p>
+                    </div>
+
+                    <div class="uk-navbar-right uk-margin-right">
+                        <div class="uk-navbar-nav">
+                            <template v-if="state === 1">
+                                <div class="uk-button-group">
+                                    <button class="uk-button uk-button-light" @click="openMailboxModal('create')"><span uk-icon="plus"></span> Create New</button>
+                                    <button class="uk-button uk-button-light" @click="loadMailboxes"><span uk-icon="refresh"></span> Refresh</button>
+                                    <button class="uk-button uk-button-light" @click="logout"><span uk-icon="sign-out"></span> Logout</button>
+                                </div>
+                            </template>
+                            <template v-else-if="state === 2">
+                                <div class="uk-button-group">
+                                    <button class="uk-button uk-button-light" @click="loadMailbox(currentMailbox)"><span uk-icon="refresh"></span> Refresh</button>
+                                    <button
+                                        class="uk-button uk-button-light"
+                                        :disabled="checkedEmailCount == 0"
+                                        @click="deleteSelectedEmails"
+                                    >
+                                        <span uk-icon="trash"></span> Delete{{ checkedEmailCount > 0 ? (' (' + checkedEmailCount + ')') : '' }}
+                                    </button>
+                                </div>
+                            </template>
+                            <template v-else-if="state === 3">
+                                <div class="uk-button-group">
+                                    <button class="uk-button uk-button-light" @click="viewInverted = !viewInverted"><span uk-icon="uikit"></span> Invert colors</button>
+                                    <button class="uk-button uk-button-light" @click="viewHeaders = !viewHeaders"><span uk-icon="database"></span> {{ viewHeaders ?  'View Body' : 'View Headers' }}</button>
+                                    <button class="uk-button uk-button-light" @click="deleteEmails(currentMailbox.id, [currentEmail.id])"><span uk-icon="trash"></span> Delete</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </nav>
+
+                <!-- All mailboxes grid view -->
+                <template v-if="state === 1">
+                    <h3 class="uk-margin-top uk-margin-left">Mailboxes</h3>
+
+                    <span v-if="mailboxes.length == 0" class="uk-display-block uk-margin-left">No Mailboxes, Create one to get started.</span>
+
+                    <div id="mailboxes_container">
+                        <div class="mailbox" v-for="mailbox in mailboxes" @click="loadMailbox(mailbox)">
+                            <span class="uk-badge unread-count" :class="{zero: mailbox.unread_count == 0}">{{ mailbox.unread_count }}</span>
+                            <p class="mailbox-name" :title="mailbox.name">{{ mailbox.name }}</p>
+                            <p class="mailbox-address uk-text-muted" :title="mailbox.address+'@'+server_name">{{ mailbox.address }}@{{ server_name }}</p>
+                            
+                            <div class="mailbox-controls">
+                                <span class="lock-status locked" uk-icon="lock" uk-tooltip="Unlock NailBox" v-if="mailbox.locked" @click.stop="toggleMailboxLocked(mailbox)"></span>
+                                <span class="lock-status" uk-icon="unlock" uk-tooltip="Lock Mailbox" v-else @click.stop="toggleMailboxLocked(mailbox)"></span>
+                                <span class="copy-icon" uk-icon="pencil" uk-tooltip="Edit Mailbox" @click.stop="openMailboxModal('edit', mailbox)"></span>
+                                <span class="time-icon" uk-icon="copy" uk-tooltip="Copy Mailbox Address" @click.stop="copyMailboxAddress(mailbox)"></span>
+                                <span class="delete-icon" uk-icon="trash" uk-tooltip="Delete Mailbox" @click.stop="deleteMailbox(mailbox)"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Single mailbox list view -->
+                <template v-else-if="state === 2">
+                    <div id="mailbox_header" class="uk-margin-left uk-margin-right">
+                        <button class="uk-button uk-button-text uk-margin-top" @click="goBack"><span uk-icon="arrow-left"></span> Go back</button>
+                        
+                        <div class="uk-child-inline-block uk-margin-top">
+                            <h3 class="uk-inline uk-margin-remove">
+                                {{ currentMailbox.name }}
+                                <span class="uk-text-small uk-text-muted">({{ currentMailbox.address }}@{{ server_name }})</span>
+                            </h3>
+
+                            <div class="mailbox-controls uk-float-right">
+                                <span class="uk-icon-button lock-status locked" uk-icon="lock" uk-tooltip="Unlock Nailbox" v-if="currentMailbox.locked" @click.stop="toggleMailboxLocked(currentMailbox)"></span>
+                                <span class="uk-icon-button lock-status" uk-icon="unlock" uk-tooltip="Lock Mailbox" v-else @click.stop="toggleMailboxLocked(currentMailbox)"></span>
+                                <span class="uk-icon-button" uk-icon="pencil" uk-tooltip="Edit Mailbox" @click.stop="openMailboxModal('edit', currentMailbox)"></span>
+                                <span class="uk-icon-button" uk-icon="copy" uk-tooltip="Copy Mailbox Address" @click.stop="copyMailboxAddress(currentMailbox)"></span>
+                                <span class="uk-icon-button" uk-icon="trash" uk-tooltip="Delete Mailbox" @click.stop="deleteMailbox(currentMailbox)"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="uk-margin-top uk-divider-small uk-divider-90">
+
+                    <div id="email_list_container">
+                        <p v-if="emails.length == 0">No emails on this Mailbox yet.</p>
+
+                        <div
+                            class="email"
+                            v-for="email in emails"
+                            :class="{read: email.read, checked: email._checked}"
+                            @click="loadEmail(email)"
+                        >
+                            <input type="checkbox" @change="Vue.set(email, '_checked', !email._checked)" @click.stop> 
+                            <p class="from">{{ email.from }}</p>
+                            <p class="subject">{{ email.subject }}</p>
+                            <p class="time">{{ timeago(email.created_at) }}</p>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Email view -->
+                <template v-else-if="state === 3">
+                    <div class="uk-margin-left">
+                        <button class="uk-button uk-button-text uk-margin-top" @click="goBack"><span uk-icon="arrow-left"></span> Go back</button>
+                        
+                        <h4 class="uk-margin-top uk-margin-remove-bottom ">{{ currentEmail.subject }}</h4>
+                        <p class="uk-margin-remove-top uk-margin-remove-bottom "><span class="uk-text-bold">From:</span> {{ currentEmail.from }}</p>
+                        <p class="uk-margin-remove-top uk-margin-remove-bottom "><span class="uk-text-bold">To:</span> {{ currentMailbox.address }}@{{ server_name }}</p>
+                        <p class="uk-margin-remove-top uk-margin-15-bottom"><span class="uk-text-bold">Time:</span> {{ timeago(currentEmail.created_at) }}</p>
+                    </div>
+
+                    <hr class="uk-margin-remove uk-divider-small uk-divider-90">
+
+                    <iframe id="email_container" :srcdoc="currentEmailBody" frameborder="0" sandbox :style="{filter: viewInverted ? 'invert(1)' : 'initial' }"></iframe>
+                </template>
+            </div>
+
+            <!-- Login screen -->
+            <div v-else-if="ready === false" id="login_container">
+                <div class="uk-position-center">
+                    <h3 class="uk-text-center">gotemp</h3>
+
+                    <div class="uk-margin">
+                        <label for="server_key_input" class="uk-form-label">Server key:</label>
+                        <input type="password" name="server_key" id="server_key_input" class="uk-input">
+                    </div>
+
+                    <div class="uk-margin uk-text-center">
+                        <button class="uk-button uk-button-primary" @click="testServerLogin">Connect</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create/edit Mailbox modal -->
+            <div id="mailbox-modal" uk-modal>
+                <div class="uk-modal-dialog uk-modal-body" :class="{'uk-light': darkMode}">
+                    <h2 class="uk-modal-title">{{ modalMode === 'edit' ? 'Edit' : 'Create' }} Mailbox</h2>
+
+                    <div class="uk-margin">
+                        <label class="uk-form-label" for="mailbox-modal-name">Name</label>
+                        <div class="uk-form-controls">
+                            <input class="uk-input" id="mailbox-modal-name" type="text" placeholder="Medium" v-model="modalName" :disabled="modalSaving" maxlength="64">
+                        </div>
+                    </div>
+
+                    <div class="uk-margin">
+                        <label class="uk-form-label" for="mailbox-modal-address">Address</label>
+                        <div class="uk-form-controls uk-form-multiple">
+                            <input class="uk-input" id="mailbox-modal-address" type="text" placeholder="medium12" v-model="modalAddress" :disabled="modalSaving" maxlength="64">
+                            <a href="javascript:void(0)" class="uk-icon-button uk-margin-small-left" uk-tooltip="Random" uk-icon="refresh" @click="modalAddress = generateRandomString(12)"></a>
+                        </div>
+                    </div>
+
+                    <div class="uk-margin">
+                        <label class="uk-form-label" for="mailbox-modal-expiration">Expiration</label>
+                        <div class="uk-form-controls uk-form-multiple">
+                            <input class="uk-input" id="mailbox-modal-expiration" type="date" v-model="modalExpiration" v-if="modalExpiration !== 'never'" :disabled="modalSaving">
+                            <input class="uk-input" id="mailbox-modal-expiration" type="text" value="never" disabled v-else>
+                            <a href="javascript:void(0)" class="uk-icon-button uk-margin-small-left" uk-tooltip="Never" v-if="modalExpiration !== 'never'" uk-icon="close" @click="modalExpiration = 'never'"></a>
+                            <a href="javascript:void(0)" class="uk-icon-button uk-margin-small-left" uk-tooltip="Date" v-else uk-icon="calendar" @click="modalExpiration = getDefaultModalDate()"></a>
+                        </div>
+                    </div>
+                    
+                    <p class="uk-text-right">
+                        <button class="uk-button uk-button-default uk-modal-close" type="button" :disabled="modalSaving">Cancel</button>
+                        <button class="uk-button uk-button-primary" type="button" @click="modalSave" :disabled="modalSaving">Save</button>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <script src="assets/useful.js"></script>
+        <script src="assets/socket.js"></script>
+        <script src="assets/script.js"></script>
+    </body>
+</html>

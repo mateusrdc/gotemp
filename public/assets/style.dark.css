@@ -1,0 +1,40 @@
+/*
+ *
+ * Main screen
+ *
+ */
+
+ /* Mailbox view */
+body.dark #container > #mailboxes_container > .mailbox {background: rgb(60, 60, 60)}
+body.dark #container > #mailboxes_container > .mailbox:hover {background: rgb(74, 74, 74)}
+
+body.dark #container > #mailboxes_container > .mailbox > .mailbox-controls {background: rgba(0, 0, 0, 0.25)}
+body.dark #container > #mailboxes_container > .mailbox:hover > .mailbox-controls {background: rgba(0, 0, 0, 0.5)}
+
+/* Emails list view */
+body.dark #container > #email_list_container > .email {border-color: rgba(255, 255, 255, 0.1)}
+
+body.dark #container > #email_list_container > .email.checked {background: rgb(25, 25, 25)}
+
+ /*
+ *
+ * Login screen
+ *
+ */
+
+ body.dark #login_container button {color: white;}
+
+/*
+ *
+ * General
+ *
+ */
+
+body.dark {background: #222}
+
+body.dark .uk-badge {background: #0074D9; color: white !important}
+
+body.dark .uk-modal-dialog, body.dark .uk-modal-footer {background: #333; color: white}
+body.dark .uk-modal-dialog button {color: white}
+body.dark .uk-modal-footer {border-color: rgb(36, 36, 36)}
+body.dark .uk-modal-footer button {color: white}

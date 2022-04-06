@@ -11,8 +11,8 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 
-	"gotemp/api"
 	"gotemp/database"
+	"gotemp/http"
 	"gotemp/smtp"
 
 	"github.com/dchest/uniuri"
@@ -74,7 +74,7 @@ func main() {
 	go smtp.Init(db)
 
 	// Init API
-	go api.Init(db, secret_key)
+	go http.Init(db, secret_key)
 
 	// Init auto deleter
 	go database.InitAutoCleaner(db)
