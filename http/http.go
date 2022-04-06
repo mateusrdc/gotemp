@@ -8,9 +8,9 @@ import (
 	"gorm.io/gorm"
 )
 
-var secret_key string
+var secret_key []byte
 
-func Init(db *gorm.DB, key string) {
+func Init(db *gorm.DB, key []byte) {
 	secret_key = key
 
 	e := echo.New()

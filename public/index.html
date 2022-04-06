@@ -144,7 +144,7 @@
             </div>
 
             <!-- Login screen -->
-            <div v-else-if="ready === false" id="login_container">
+            <div v-else-if="ready === false && server_configured" id="login_container">
                 <div class="uk-position-center">
                     <h3 class="uk-text-center">gotemp</h3>
 
@@ -155,6 +155,23 @@
 
                     <div class="uk-margin uk-text-center">
                         <button class="uk-button uk-button-primary" @click="testServerLogin">Connect</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configure initial password screen -->
+            <div v-else-if="ready === false && !server_configured" id="setup_container">
+                <div class="uk-position-center">
+                    <h3 class="uk-text-center uk-margin-small-bottom">gotemp</h3>
+                    <h5 class="uk-text-center uk-margin-remove-top">The server is currently unconfigured, please input a key to use in future logins:</h5>
+
+                    <div class="uk-margin">
+                        <label for="server_new_key_input" class="uk-form-label">New key:</label>
+                        <input type="password" name="server_new_key" id="server_new_key_input" class="uk-input">
+                    </div>
+
+                    <div class="uk-margin uk-text-center">
+                        <button class="uk-button uk-button-primary" @click="configureServer">Configure</button>
                     </div>
                 </div>
             </div>

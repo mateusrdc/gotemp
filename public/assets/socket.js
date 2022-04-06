@@ -1,5 +1,5 @@
 class SocketInterface {
-    constructor(url, key) {
+    constructor(url, token) {
         if (url.startsWith("http://")) {
             url = "ws://" + url.substr(url.indexOf("//")+2);
         } else if (url.startsWith("https://")) {
@@ -7,7 +7,7 @@ class SocketInterface {
         }
 
         this.url = url;
-        this.key = key;
+        this.token = token;
         this.suppressCloseMessage = false;
 
         this.connect();
@@ -23,7 +23,7 @@ class SocketInterface {
     }
 
     auth() {
-        this.socket.send("auth " + this.key);
+        this.socket.send("auth " + this.token);
     }
 
     onMessage(messageData) {

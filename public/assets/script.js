@@ -6,6 +6,7 @@ const app = new Vue({
         socket: null,
 
         server_name: null,
+        server_configured: true,
         ready: false,
         state: 1,
         darkMode: false,
@@ -27,27 +28,45 @@ const app = new Vue({
     },
 
     methods: {
-        async tryConnect(key) {
+        async tryConnect(token) {
             const server_address = getServerAddress();
             const api_address = getApiAddress();
-            const result = await checkApiServer(api_address, key)
+            const result = await checkApiServer(api_address, token)
 
             if (result) {
                 notify("Connection established!", "success");
 
-                this.api = new ApiInterface(api_address, key);
-                this.socket = new SocketInterface(server_address, key);
+                this.api = new ApiInterface(api_address, token);
+                this.socket = new SocketInterface(server_address, token);
                 this.server_name = result.server_name;
-                this.ready = true;
+                this.server_configured = !result.unconfigured;
                 
-                this.loadMailboxes();
+                if (this.server_configured) {
+                    this.ready = true;
+                    this.loadMailboxes();
+                }
 
                 return true;
             } else {
-                notify("Error connecting to server!", "danger");
+                if (token !== null) {
+                    notify("Error connecting to server!", "danger");
+                }
 
                 return false;
             }
+        },
+
+        async configureServer() {
+            const new_key = document.querySelector("#server_new_key_input").value;
+
+            await this.api.PUT("/key", new_key)
+                .then(result => {
+                    localStorage.setItem("server_jwt", result.token);
+                    this.tryConnect(result.token);
+                })
+                .catch(e => {
+                    notify("Error setting key!");
+                })
         },
 
         async loadMailboxes() {
@@ -227,7 +246,7 @@ const app = new Vue({
         async logout() {
             await UIkit.modal.confirm("Are you sure you want to logout?")
                 .then(async () => {
-                    localStorage.removeItem("server_key");
+                    localStorage.removeItem("server_jwt");
                     window.location.reload();
                 })
                 .catch(e => { });
@@ -280,13 +299,9 @@ const app = new Vue({
         }
 
         // Try to load data from localStorage
-        const key = localStorage.getItem("server_key")
+        const token = localStorage.getItem("server_jwt")
 
-        if (key) {
-            await this.tryConnect(key);
-        } else {
-            this.ready = false;
-        }
+        await this.tryConnect(token);
 
         // Load mailboxes if we're ready
         if (this.ready) {

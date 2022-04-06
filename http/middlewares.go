@@ -7,20 +7,11 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func AuthMiddleware(key string) echo.MiddlewareFunc {
+func AuthMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			header := c.Request().Header.Get("Authorization")
-
-			// Valid tokens are in the following format:
-			// bearer 94083a69h866055ef6x9fe216f968446e133...(128 chars)
-			// We can fail fast by checking if the length matches
-			if header == "" || len(header) != (128+7) || header[6:7] != " " {
-				return c.JSON(http.StatusUnauthorized, echo.Map{"success": false, "error": "Unauthorized"})
-			}
-
-			// Make surethe token matches
-			if header[7:] != key {
+			// Make sure the tokens matches
+			if !validateJwtFromRequest(c) {
 				return c.JSON(http.StatusUnauthorized, echo.Map{"success": false, "error": "Unauthorized"})
 			}
 

@@ -2,8 +2,13 @@ package http
 
 import (
 	"gotemp/database"
+	"io"
+	"net/http"
+	"os"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -22,12 +27,14 @@ type MailBoxForm struct {
 func initAPI(e *echo.Echo, db *gorm.DB) {
 	api := API{Database: db, ServerName: GetEnv("SMTP_DOMAIN", "gotemp")}
 
+	e.POST("api/login", api.Login)
+	e.GET("api/status", api.GetStatus)
+	e.PUT("api/key", api.SetKey)
+
 	g := e.Group("/api")
 	{
 		e.Use(CorsMiddleware())
-		g.Use(AuthMiddleware(secret_key))
-
-		g.GET("/status", api.GetStatus)
+		g.Use(AuthMiddleware())
 
 		g.GET("/mailboxes", api.GetAll)
 		g.GET("/mailboxes/:id", api.GetOne)
@@ -39,10 +46,67 @@ func initAPI(e *echo.Echo, db *gorm.DB) {
 	}
 }
 
+// POST /login: logs in and generates a new JWT
+// {success: bool}
+func (api *API) Login(c echo.Context) error {
+	key_bytes, err := io.ReadAll(c.Request().Body)
+	if err != nil || len(key_bytes) == 0 {
+		return c.JSON(http.StatusBadRequest, echo.Map{"success": false, "error": ""})
+	}
+
+	if err := bcrypt.CompareHashAndPassword(secret_key, key_bytes); err != nil {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"success": false, "error": "Invalid password"})
+	}
+
+	token := jwt.New(jwt.SigningMethodHS512)
+	ss, err := token.SignedString(secret_key)
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"success": false, "error": ""})
+	}
+
+	return c.JSON(200, echo.Map{"success": true, "token": ss})
+}
+
 // GET /status: checks whether the client is authorized to make further queries
 // {success: bool}
 func (api *API) GetStatus(c echo.Context) error {
-	return c.JSON(200, echo.Map{"success": true, "server_name": api.ServerName})
+	if len(secret_key) != 0 && !validateJwtFromRequest(c) {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"success": false, "error": "Unauthorized"})
+	}
+
+	return c.JSON(200, echo.Map{"success": true, "server_name": api.ServerName, "unconfigured": len(secret_key) == 0})
+}
+
+// PUT /key: sets the server's secret key
+// {success: bool}
+func (api *API) SetKey(c echo.Context) error {
+	if len(secret_key) != 0 {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"success": false, "error": "Unauthorized"})
+	}
+
+	new_key_bytes, err := io.ReadAll(c.Request().Body)
+	if err != nil || len(new_key_bytes) == 0 {
+		return c.JSON(http.StatusBadRequest, echo.Map{"success": false, "error": ""})
+	}
+
+	new_key, err := bcrypt.GenerateFromPassword(new_key_bytes, 12)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"success": false, "error": ""})
+	}
+
+	secret_key = new_key
+	os.WriteFile("key.secret", new_key, 0700)
+
+	// Generate a new token for the user
+	token := jwt.New(jwt.SigningMethodHS512)
+	ss, err := token.SignedString(secret_key)
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"success": false, "error": ""})
+	}
+
+	return c.JSON(200, echo.Map{"success": true, "token": ss})
 }
 
 // GET /mailboxes: returns all mailboxes

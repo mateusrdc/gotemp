@@ -39,7 +39,7 @@ func socketHandler(c echo.Context) error {
 		}
 	}()
 
-	// Try to read authentication key
+	// Try to read authentication token
 	conn.SetReadDeadline(time.Now().Add(time.Second * 15))
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
@@ -47,10 +47,10 @@ func socketHandler(c echo.Context) error {
 	}
 
 	message := string(msg)
-	if len(message) == 133 && strings.HasPrefix(message, "auth ") {
-		input_key := strings.TrimPrefix(message, "auth ")
+	if strings.HasPrefix(message, "auth ") {
+		input_token := strings.TrimPrefix(message, "auth ")
 
-		if input_key == secret_key {
+		if result := validateJwt(input_token); result {
 			// Save client
 			client := Client{conn: conn, send: make(chan []byte, 64)}
 			clients = append(clients, &client)

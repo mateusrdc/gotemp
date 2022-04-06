@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"io"
 	"log"
 	"os"
@@ -14,12 +13,10 @@ import (
 	"gotemp/database"
 	"gotemp/http"
 	"gotemp/smtp"
-
-	"github.com/dchest/uniuri"
 )
 
 var db *gorm.DB
-var secret_key string
+var secret_key []byte
 
 func main() {
 	godotenv.Load()
@@ -36,28 +33,10 @@ func main() {
 	log.SetOutput(mw)
 
 	// Try to load secret key from file
-	generate_new_key := flag.Bool("generate-key", false, "Whether to generate a new secret key")
-
-	flag.Parse()
-
-	if *generate_new_key {
-		new_key := uniuri.NewLen(128)
-
-		os.WriteFile("key.secret", []byte(new_key), 0700)
-		secret_key = new_key
-
-		log.Fatalf("Done! Your new secret key is: %s\n", new_key)
+	if data, err := os.ReadFile("key.secret"); err != nil {
+		log.Println("Couldn't load key.secret file, Use the WebUI to set a key.")
 	} else {
-		if data, err := os.ReadFile("key.secret"); err != nil {
-			log.Fatalln("ERROR: Couldn't load key.secret file, Run the program with --generate-key to generate a new key.")
-		} else {
-			secret_key = string(data)
-
-			if len(secret_key) != 128 {
-				log.Println("ERROR: Your secret key appears to be invalid (length isn't 128).")
-				log.Fatalln("ERROR: Please fix it or create a new key with the --generate-key parameter.")
-			}
-		}
+		secret_key = data
 	}
 
 	// Init database

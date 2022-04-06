@@ -1,7 +1,7 @@
 class ApiInterface {
-    constructor(url, key) {
+    constructor(url, token) {
         this.url = url;
-        this.key = key;
+        this.token = token;
     }
 
     async _doRequest(method, url, data = null) {
@@ -10,7 +10,7 @@ class ApiInterface {
         return await fetch(this.url + url, {
             method,
             headers: {
-                "Authorization": "bearer " + this.key,
+                "Authorization": "bearer " + this.token,
                 "Content-Type": "application/json"
             },
             body
@@ -59,8 +59,8 @@ function getApiAddress() {
     return getServerAddress() + "/api";
 }
 
-async function checkApiServer(url, key) {
-    return await fetch(url + "/status", {headers: {"Authorization": "bearer " + key}})
+async function checkApiServer(url, token) {
+    return await fetch(url + "/status", {headers: {"Authorization": "bearer " + token}})
         .then(async r => {
             if (!r.ok) {
                 return false;
@@ -84,11 +84,30 @@ async function testServerLogin() {
     const keyInput = document.querySelector("#server_key_input");
 
     // Test connection
-    const result = await app.tryConnect(keyInput.value);
+    const result = await fetch(getApiAddress() + "/login", { method: "POST", body: keyInput.value })
+        .then(async r => {
+            if (!r.ok) {
+                return false;
+            }
+
+            const data = await r.json();
+
+            if (data.success) {
+                return data;
+            } else {
+                console.log(data);
+                return false;
+            }
+        })
+        .catch(e => {
+            return false;
+        });
 
     if (result) {
-        localStorage.setItem("server_key", keyInput.value);
+        localStorage.setItem("server_jwt", result.token);
+        app.tryConnect(result.token);
     } else {
+        notify("Incorrect password", "danger");
         keyInput.value = "";
     }
 }

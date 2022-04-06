@@ -4,6 +4,9 @@ import (
 	"errors"
 	"os"
 	"time"
+
+	"github.com/golang-jwt/jwt"
+	"github.com/labstack/echo/v4"
 )
 
 func parseExpiration(expiration string) (time.Time, error) {
@@ -29,6 +32,27 @@ func parseExpiration(expiration string) (time.Time, error) {
 		// No expiration time set, default to 24 hours from now
 		return time.Now().Add(time.Hour * 24), nil
 	}
+}
+
+func validateJwt(attempt_token string) bool {
+	token, _ := jwt.Parse(attempt_token, func(t *jwt.Token) (interface{}, error) {
+		return secret_key, nil
+	})
+
+	return token.Valid
+}
+
+func validateJwtFromRequest(c echo.Context) bool {
+	header := c.Request().Header.Get("Authorization")
+
+	// Valid tokens are in the following format:
+	// bearer secretkeyhere
+	if header == "" || header[6:7] != " " {
+		return false
+	}
+
+	// Make sure the token is valid
+	return validateJwt(header[7:])
 }
 
 func isDirectory(path string) bool {
