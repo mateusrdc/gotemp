@@ -124,7 +124,9 @@ func (api *API) GetAll(c echo.Context) error {
 func (api *API) GetOne(c echo.Context) error {
 	var mailbox database.MailBox
 
-	if q := api.Database.Where("id = ?", c.Param("id")).Preload("Emails").Limit(1).Find(&mailbox); q.RowsAffected == 0 {
+	sortEmails := func(db *gorm.DB) *gorm.DB { return db.Order("created_at desc") }
+
+	if q := api.Database.Where("id = ?", c.Param("id")).Preload("Emails", sortEmails).Limit(1).Find(&mailbox); q.RowsAffected == 0 {
 		return c.JSON(400, echo.Map{"success": false, "error": "Invalid mailbox"})
 	}
 
