@@ -95,15 +95,8 @@
                             <h3 class="uk-inline uk-margin-remove">
                                 {{ currentMailbox.name }}
                                 <span class="uk-text-small uk-text-muted">({{ currentMailbox.address }}@{{ server_name }})</span>
-                            </h3>
-
-                            <div class="mailbox-controls uk-float-right">
-                                <span class="uk-icon-button lock-status locked" uk-icon="lock" uk-tooltip="Unlock Nailbox" v-if="currentMailbox.locked" @click.stop="toggleMailboxLocked(currentMailbox)"></span>
-                                <span class="uk-icon-button lock-status" uk-icon="unlock" uk-tooltip="Lock Mailbox" v-else @click.stop="toggleMailboxLocked(currentMailbox)"></span>
-                                <span class="uk-icon-button" uk-icon="pencil" uk-tooltip="Edit Mailbox" @click.stop="openMailboxModal('edit', currentMailbox)"></span>
                                 <span class="uk-icon-button" uk-icon="copy" uk-tooltip="Copy Mailbox Address" @click.stop="copyMailboxAddress(currentMailbox)"></span>
-                                <span class="uk-icon-button" uk-icon="trash" uk-tooltip="Delete Mailbox" @click.stop="deleteMailbox(currentMailbox)"></span>
-                            </div>
+                            </h3>
                         </div>
                     </div>
 
