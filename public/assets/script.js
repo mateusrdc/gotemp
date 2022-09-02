@@ -278,7 +278,7 @@ const app = new Vue({
             if (this.state === 2) {
                 this.state = 1;
                 this.currentMailbox = null;
-                this.emails = null;
+                this.emails = [];
                 this.lastCheckedEmailID = null;
             } else if (this.state == 3) {
                 this.state = 2;
