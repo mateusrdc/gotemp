@@ -10,12 +10,14 @@ const app = new Vue({
         ready: false,
         state: 1,
         darkMode: false,
+        shiftKeyPressed: false,
 
         mailboxes: [],
         currentMailbox: null,
 
         emails: [],
         currentEmail: null,
+        lastCheckedEmailID: null,
         viewHeaders: false,
         viewInverted: false,
 
@@ -188,6 +190,26 @@ const app = new Vue({
             await this.deleteEmails(this.currentMailbox.id, email_list);
         },
 
+        mailboxEmailCheckboxChanged(email) {
+            // Handle shift + click to select multiple emails
+            if (email._checked) {
+                if (this.lastCheckedEmailID && this.shiftKeyPressed) {
+                    const emailIndex = this.emails.findIndex(e => e.id === email.id);
+                    const lastCheckedEmailIndex = this.emails.findIndex(e => e.id === this.lastCheckedEmailID);
+
+                    if (emailIndex !== -1 && lastCheckedEmailIndex != -1) {
+                        for (let i = Math.min(emailIndex, lastCheckedEmailIndex) + 1 ; i < Math.max(emailIndex, lastCheckedEmailIndex) ; i++) {
+                            this.emails[i]._checked = true;
+                        }
+                    }
+                }
+
+                this.lastCheckedEmailID = email.id;
+            } else {
+                this.lastCheckedEmailID = null;
+            }
+        },
+
         openMailboxModal(mode, mailbox) {
             this.modalMode = mode;
             this.modalName = mailbox ? mailbox.name : "";
@@ -257,6 +279,7 @@ const app = new Vue({
                 this.state = 1;
                 this.currentMailbox = null;
                 this.emails = null;
+                this.lastCheckedEmailID = null;
             } else if (this.state == 3) {
                 this.state = 2;
                 this.currentEmail = null;
@@ -307,5 +330,9 @@ const app = new Vue({
         if (this.ready) {
             this.loadMailboxes();
         }
+
+        // Listen for the shift key up/down events
+        document.addEventListener("keyup", e => { this.shiftKeyPressed = e.shiftKey });
+        document.addEventListener("keydown", e => { this.shiftKeyPressed = e.shiftKey });
     }
 })

@@ -111,7 +111,7 @@
                             :class="{read: email.read, checked: email._checked}"
                             @click="loadEmail(email)"
                         >
-                            <input type="checkbox" @change="Vue.set(email, '_checked', !email._checked)" @click.stop> 
+                            <input type="checkbox" v-model="email._checked" @change="mailboxEmailCheckboxChanged(email)" @click.stop> 
                             <p class="from">{{ email.from }}</p>
                             <p class="subject">{{ email.subject }}</p>
                             <p class="time">{{ timeago(email.created_at) }}</p>
