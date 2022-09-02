@@ -35,9 +35,13 @@ func parseExpiration(expiration string) (time.Time, error) {
 }
 
 func validateJwt(attempt_token string) bool {
-	token, _ := jwt.Parse(attempt_token, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(attempt_token, func(t *jwt.Token) (interface{}, error) {
 		return secret_key, nil
 	})
+
+	if err != nil {
+		return false
+	}
 
 	return token.Valid
 }
