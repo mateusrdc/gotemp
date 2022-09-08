@@ -54,7 +54,6 @@
                             </template>
                             <template v-else-if="state === 3">
                                 <div class="uk-button-group">
-                                    <button class="uk-button uk-button-light" @click="viewInverted = !viewInverted"><span uk-icon="uikit"></span> Invert colors</button>
                                     <button class="uk-button uk-button-light" @click="viewHeaders = !viewHeaders"><span uk-icon="database"></span> {{ viewHeaders ?  'View Body' : 'View Headers' }}</button>
                                     <button class="uk-button uk-button-light" @click="deleteEmails(currentMailbox.id, [currentEmail.id])"><span uk-icon="trash"></span> Delete</button>
                                 </div>
@@ -132,7 +131,7 @@
 
                     <hr class="uk-margin-remove uk-divider-small uk-divider-90">
 
-                    <iframe id="email_container" :srcdoc="currentEmailBody" frameborder="0" sandbox :style="{filter: viewInverted ? 'invert(1)' : 'initial' }"></iframe>
+                    <iframe id="email_container" :srcdoc="currentEmailBody" frameborder="0" sandbox></iframe>
                 </template>
             </div>
 

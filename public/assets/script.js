@@ -19,7 +19,6 @@ const app = new Vue({
         currentEmail: null,
         lastCheckedEmailID: null,
         viewHeaders: false,
-        viewInverted: false,
 
         modalMode: "",
         modalName: "",
@@ -284,7 +283,6 @@ const app = new Vue({
                 this.state = 2;
                 this.currentEmail = null;
                 this.viewHeaders = false;
-                this.viewInverted = false;
             }
         },
 
@@ -300,7 +298,24 @@ const app = new Vue({
             if (!this.currentEmail) return "";
 
             if (!this.viewHeaders) {
-                return DOMPurify.sanitize(this.currentEmail.body, { WHOLE_DOCUMENT: true, FORCE_BODY: true, ADD_TAGS: ["link"], ADD_ATTR: ["href"] });
+                let html = DOMPurify.sanitize(this.currentEmail.body, { WHOLE_DOCUMENT: true, FORCE_BODY: true, ADD_TAGS: ["link"], ADD_ATTR: ["href"] });
+
+                // Inject our custom styling onto the html
+                const styleTag = `
+                    <style>
+                        body {font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
+
+                        ${this.darkMode ?
+                            "body {color: rgba(255,255,255,.7)} \
+                            a {color: #fff}"
+                        : ''}
+                    </style>
+                `;
+
+                let index = html.indexOf("<body>")
+                html = html.substring(0, index + 6) + styleTag + html.substring(index + 6, html.length - 1)
+
+                return html
             } else {
                 return DOMPurify.sanitize(this.currentEmail.headers.replaceAll("\n", "<br/>"), {});
             }
