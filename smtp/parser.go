@@ -69,8 +69,8 @@ func ParseData(data string, trace bool) (string, string) {
 				mime_type = value[14:]
 			}
 
-			if mime_type == "multipart/alternative" {
-				tracePrintf(trace, "multipart/alternative found (line: %s)\n", value)
+			if mime_type == "multipart/alternative" || mime_type == "multipart/mixed" {
+				tracePrintf(trace, "%s found (line: %s)\n", mime_type, value)
 
 				// Find boundary
 				if start_idx := strings.Index(value, "boundary=\""); start_idx != -1 {
