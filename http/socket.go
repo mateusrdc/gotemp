@@ -1,70 +1,73 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
-	"log"
-	"net/http"
+	"errors"
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
+	"nhooyr.io/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
-
-type Client struct {
-	conn *websocket.Conn
-
-	send chan []byte
-}
-
-var clients = make([]*Client, 0)
+var clients = make([]*websocket.Conn, 0)
 
 func socketHandler(c echo.Context) error {
-	w := c.Response()
-	r := c.Request()
-
-	conn, err := upgrader.Upgrade(w, r, nil)
-	close := true
+	conn, err := websocket.Accept(c.Response(), c.Request(), nil)
 	if err != nil {
-		return nil
+		return errors.New("couldn't establish websocket connection")
 	}
+	defer conn.Close(websocket.StatusGoingAway, "going away")
+	defer removeClient(conn)
 
-	defer func() {
-		if close {
-			conn.Close()
+	conn.SetReadLimit(256)
+
+	// Wait for messages
+	loggedIn := false
+
+	for {
+		// Set a read deadline
+		var ctx context.Context
+		var cancel context.CancelFunc
+
+		if !loggedIn {
+			ctx, cancel = context.WithTimeout(context.Background(), time.Second*15)
+		} else {
+			ctx, cancel = context.WithTimeout(context.Background(), time.Minute*2)
 		}
-	}()
+		defer cancel()
 
-	// Try to read authentication token
-	conn.SetReadDeadline(time.Now().Add(time.Second * 15))
-	_, msg, err := conn.ReadMessage()
-	if err != nil {
-		return nil
-	}
+		// Read message
+		messageType, message, err := conn.Read(ctx)
+		if err != nil {
+			break
+		}
+		if messageType != websocket.MessageText {
+			continue
+		}
 
-	message := string(msg)
-	if strings.HasPrefix(message, "auth ") {
-		input_token := strings.TrimPrefix(message, "auth ")
+		parts := strings.SplitN(string(message), " ", 2)
 
-		if result := validateJwt(input_token); result {
-			// Save client
-			client := Client{conn: conn, send: make(chan []byte, 64)}
-			clients = append(clients, &client)
+		switch parts[0] {
+		case "auth":
+			if len(parts) < 2 {
+				conn.Write(context.Background(), websocket.MessageText, []byte(`{"type": "AUTH_ERROR", "data": null}`))
+			}
 
-			conn.WriteMessage(websocket.TextMessage, []byte("{\"type\": \"AUTH_OK\", \"data\": null}"))
-			go client.writePump()
-			go client.readPump()
-			close = false
+			if ok := validateJwt(parts[1]); ok {
+				// Save client, removing them if logged-in already
+				removeClient(conn)
+				clients = append(clients, conn)
+				loggedIn = true
 
-			return nil
+				conn.Write(context.Background(), websocket.MessageText, []byte(`{"type": "AUTH_OK", "data": null}`))
+			} else {
+				conn.Write(context.Background(), websocket.MessageText, []byte(`{"type": "AUTH_ERROR", "data": null}`))
+			}
 		}
 	}
 
-	conn.WriteMessage(websocket.TextMessage, []byte("{\"type\": \"AUTH_ERROR\", \"data\": null}"))
 	return nil
 }
 
@@ -73,50 +76,21 @@ func SendSocketMessage(msgtype string, data interface{}) {
 	if err != nil {
 		return
 	}
-	for _, client := range clients {
-		client.send <- json_string
-	}
-}
 
-func (c *Client) writePump() {
-	defer func() {
-		removeClient(c)
-		c.conn.Close()
+	go func() {
+		for _, conn := range clients {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer cancel()
+
+			conn.Write(ctx, websocket.MessageText, []byte(json_string))
+		}
 	}()
-
-	for {
-		message, ok := <-c.send
-		if !ok {
-			return
-		}
-
-		err := c.conn.WriteMessage(websocket.TextMessage, message)
-		if err != nil {
-			log.Printf("error writing socket message: %v", err)
-		}
-	}
 }
 
-func (c *Client) readPump() {
-	defer func() {
-		removeClient(c)
-		c.conn.Close()
-	}()
-	c.conn.SetReadDeadline(time.Time{}) // Reset read limit
-	c.conn.SetReadLimit(1)
-	for {
-		_, _, err := c.conn.ReadMessage()
-		if err != nil {
-			break
-		}
-	}
-}
-
-func removeClient(c *Client) {
+func removeClient(c *websocket.Conn) {
 	for index, client := range clients {
 		if client == c {
-			clients[index] = clients[len(clients)-1]
-			clients = clients[:len(clients)-1]
+			clients = append(clients[:index], clients[index+1:]...)
 		}
 	}
 }
