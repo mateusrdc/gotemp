@@ -1,14 +1,11 @@
 class SocketInterface {
     constructor(url, token) {
-        if (url.startsWith("http://")) {
-            url = "ws://" + url.substr(url.indexOf("//")+2);
-        } else if (url.startsWith("https://")) {
-            url = "wss://" + url.substr(url.indexOf("//") + 2);
-        }
+        const protocol = new URL(url).protocol === "https:" ? "wss:" : "ws:";
 
-        this.url = url;
+        this.url = protocol + "//" + url.substr(url.indexOf("//") + 2);
         this.token = token;
         this.suppressCloseMessage = false;
+        this.pingInterval = null;
 
         this.connect();
     }
@@ -26,7 +23,13 @@ class SocketInterface {
         this.socket.send("auth " + this.token);
     }
 
+    sendPing() {
+        this.socket.send("ping");
+    }
+
     onMessage(messageData) {
+        if (messageData === "pong") return;
+
         let message;
 
         try {
@@ -37,6 +40,9 @@ class SocketInterface {
 
         switch(message.type) {
             case "AUTH_OK": {
+                // Init ping interval
+                this.pingInterval = setInterval(this.sendPing.bind(this), 60 * 1000)
+
                 break;
             }
             case "AUTH_ERROR": {

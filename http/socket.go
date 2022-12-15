@@ -65,6 +65,8 @@ func socketHandler(c echo.Context) error {
 			} else {
 				conn.Write(context.Background(), websocket.MessageText, []byte(`{"type": "AUTH_ERROR", "data": null}`))
 			}
+		case "ping":
+			conn.Write(context.Background(), websocket.MessageText, []byte(`pong`))
 		}
 	}
 
