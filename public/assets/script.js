@@ -300,6 +300,9 @@ const app = new Vue({
             if (!this.viewHeaders) {
                 let html = DOMPurify.sanitize(this.currentEmail.body, { WHOLE_DOCUMENT: true, FORCE_BODY: true, ADD_TAGS: ["link"], ADD_ATTR: ["href"] });
 
+                // Make sure links will open in a new tab
+                html = html.replaceAll("<a ", `<a target="_blank" `);
+
                 // Inject our custom styling onto the html
                 const styleTag = `
                     <style>
