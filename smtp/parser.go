@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	content_type_regex     = regexp.MustCompile(`(?im)^Content-Type:\s\w*\/\w*.*(\n\s.*.*)?`)
-	content_encoding_Regex = regexp.MustCompile(`(?im)^Content-Transfer-Encoding: (.*)$`)
+	content_type_regex          = regexp.MustCompile(`(?im)^Content-Type:\s\w*\/\w*.*(\n\s.*.*)?`)
+	content_type_boundary_regex = regexp.MustCompile(`boundary\=\"?([^\"\r\n]{1,512})`)
+	content_encoding_Regex      = regexp.MustCompile(`(?im)^Content-Transfer-Encoding: (.*)$`)
 )
 
 func GetHeaders(data string) (*textproto.MIMEHeader, error) {
@@ -73,11 +74,9 @@ func ParseData(data string, trace bool) (string, string) {
 				tracePrintf(trace, "%s found (line: %s)\n", mime_type, value)
 
 				// Find boundary
-				if start_idx := strings.Index(value, "boundary=\""); start_idx != -1 {
-					if end_idx := strings.Index(value[start_idx+10:], "\""); end_idx != -1 {
-						alternatives_boundary = value[start_idx+10 : start_idx+10+end_idx]
-						tracePrintf(trace, "multipart/alternative boundary found (%s)\n", alternatives_boundary)
-					}
+				if boundary_matches := content_type_boundary_regex.FindStringSubmatch(value); len(boundary_matches) == 2 {
+					alternatives_boundary = boundary_matches[1]
+					tracePrintf(trace, "multipart/alternative boundary found (%s)\n", alternatives_boundary)
 				}
 			} else if !strings.HasPrefix(mime_type, "multipart/") {
 				if first_mime == "" {
