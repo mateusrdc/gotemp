@@ -9,6 +9,7 @@ import (
 	qp "mime/quotedprintable"
 	"net/textproto"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -54,21 +55,13 @@ func ParseData(data string, trace bool) (string, string) {
 		dumb_parse = true
 		tracePrintln(trace, "Falling back to dumb paser due to no content_type")
 	} else {
-		mimes_baseidx := make(map[string]int)
 		preferred_mimes := []string{"text/html", "text/plain"}
 		var alternatives_boundary string
-		var first_mime string
+		var mime_types []string
 
 		// Check if we should use any boundary (when there's multiple content options available)
 		for _, value := range content_types {
-			var mime_type string
-
-			// Find MIME type
-			if idx := strings.Index(value, ";"); idx != -1 {
-				mime_type = value[14:idx]
-			} else {
-				mime_type = value[14:]
-			}
+			mime_type := getContentTypeHeaderValue(value)
 
 			if mime_type == "multipart/alternative" || mime_type == "multipart/mixed" {
 				tracePrintf(trace, "%s found (line: %s)\n", mime_type, value)
@@ -79,52 +72,72 @@ func ParseData(data string, trace bool) (string, string) {
 					tracePrintf(trace, "multipart/alternative boundary found (%s)\n", alternatives_boundary)
 				}
 			} else if !strings.HasPrefix(mime_type, "multipart/") {
-				if first_mime == "" {
-					first_mime = mime_type
-				}
-
-				// Store the (text position) index of the header
-				content_type_regex, err := regexp.Compile("(?i)Content-Type: " + regexp.QuoteMeta(mime_type))
-
-				if err == nil {
-					if base_idx := content_type_regex.FindStringIndex(data); base_idx != nil {
-						mimes_baseidx[mime_type] = base_idx[0]
-					}
-				} else {
-					if base_idx := strings.Index(data, "Content-Type: "+mime_type); base_idx != -1 {
-						mimes_baseidx[mime_type] = base_idx
-					}
-				}
+				mime_types = append(mime_types, mime_type)
 			}
 		}
 
 		// Do we have multiple content options?
-		if alternatives_boundary != "" && first_mime != "" {
-			// Default to the first mime type found
-			base_idx := mimes_baseidx[first_mime]
-
-			tracePrintf(trace, "First MIME (default): \"%s\"\n", first_mime)
-			tracePrintf(trace, "Mime base index: %d\n", base_idx)
+		if alternatives_boundary != "" && len(mime_types) > 0 {
+			target_body := ""
+			target_mimetype := mime_types[0]
 
 			// Check if any of our preferred mime types were found
 			for _, preferred_mime := range preferred_mimes {
-				if idx, ok := mimes_baseidx[preferred_mime]; ok {
+				if slices.Contains(mime_types, preferred_mime) {
 					tracePrintf(trace, "Preferred MIME found: \"%s\"\n", preferred_mime)
-					tracePrintf(trace, "Preferred MIME index: %d\n", idx)
-
-					base_idx = idx
+					target_mimetype = preferred_mime
 					break
 				}
 			}
 
-			// Try to extract the body using the provided MIME's starting position (string index on the document)
-			base_str := data[base_idx:]
+			// Loop through all the boundary-delimited items
+			boundary_with_delimiter := "--" + alternatives_boundary
+			boundary_index := strings.Index(data, boundary_with_delimiter)
 
-			tracePrintf(trace, "Body base string: \"%s\"\n", base_str)
+			for boundary_index != 1 {
+				// The last boundary is followed by double dashes ("--")
+				// when we find them we know there's no other boundary left
+				// so we can break the loop
+				if data[boundary_index+len(boundary_with_delimiter):boundary_index+len(boundary_with_delimiter)+2] == "--" {
+					break
+				}
 
-			if start_idx := strings.Index(base_str, "\n\n"); start_idx != -1 {
-				if end_idx := strings.Index(base_str, "--"+alternatives_boundary); end_idx != -1 {
-					body := strings.Trim(data[base_idx+start_idx+2:base_idx+end_idx], "\t \n")
+				// Find the next boundary
+				next_boundary_index := indexAfter(data, boundary_with_delimiter, boundary_index+len(boundary_with_delimiter))
+				var boundary_contents string
+
+				if next_boundary_index != -1 {
+					// This should always be the case as even the last boundary-delimited
+					// item needs a closing boundary after the body
+					// but check nonetheless to avoid misconstructed emails
+					boundary_contents = data[boundary_index+len(boundary_with_delimiter) : next_boundary_index]
+				} else {
+					boundary_contents = data[boundary_index+len(boundary_with_delimiter):]
+				}
+
+				// Continue the loop
+				boundary_index = next_boundary_index
+
+				// Check if this boundary contains the desired mimetype
+				if content_type := content_type_regex.FindString(boundary_contents); content_type != "" {
+					mime_type := getContentTypeHeaderValue(content_type)
+
+					if mime_type == target_mimetype {
+						target_body = boundary_contents
+						break
+					}
+				}
+			}
+
+			tracePrintf(trace, "Target MIME-type: \"%s\"\n", target_mimetype)
+
+			if target_body != "" {
+				tracePrintf(trace, "Body base string: \"%s\"\n", target_body)
+
+				// Extract all the headers, getting only the body text/html
+				// it will come after the headers and an empty newline (\n\n)
+				if start_idx := strings.Index(target_body, "\n\n"); start_idx != -1 {
+					body := strings.Trim(target_body[start_idx+2:], "\t \n")
 
 					tracePrintf(trace, "Detected body: \"%s\"\n", body)
 
@@ -132,7 +145,7 @@ func ParseData(data string, trace bool) (string, string) {
 						var encoding string
 
 						// Find message encoding
-						if matches := content_encoding_Regex.FindStringSubmatch(base_str[:start_idx]); matches != nil {
+						if matches := content_encoding_Regex.FindStringSubmatch(target_body[:start_idx]); matches != nil {
 							if len(matches) == 2 {
 								encoding = matches[1]
 							}
@@ -220,6 +233,28 @@ func normalizeNewlines(data string) string {
 	data = strings.ReplaceAll(data, "\r", "\n")
 
 	return data
+}
+
+// Similar to strings.Index, but with an offset
+func indexAfter(s string, substr string, after int) int {
+	result := strings.Index(s[after:], substr)
+
+	if result == -1 {
+		return -1
+	} else {
+		return result + after
+	}
+}
+
+// Gets the Content-Type header value from its whole line
+//
+// "Content-Type: text/plain; charset=us-ascii" => "text/plain"
+func getContentTypeHeaderValue(s string) string {
+	if idx := strings.Index(s, ";"); idx != -1 {
+		return s[14:idx]
+	} else {
+		return s[14:]
+	}
 }
 
 func tracePrintln(trace bool, v ...interface{}) {
