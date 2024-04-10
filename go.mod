@@ -1,6 +1,6 @@
 module gotemp
 
-go 1.17
+go 1.18
 
 require (
 	github.com/emersion/go-smtp v0.15.1-0.20211103212524-30169acc42e7
